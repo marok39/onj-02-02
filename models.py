@@ -16,7 +16,6 @@ class BasicModel:
         self.correct_answers = {}
         for q, r in zip(question_data, response_data):
             self.correct_answers[q] = r
-        print(self.correct_answers)
         self.model = Word2Vec(inference_data, min_count=1)
         self.model.save("basic_model.model")
 

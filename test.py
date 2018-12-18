@@ -22,8 +22,8 @@ def test_modelA():
 
     model = BasicModel()
     predictions = [model.predict(q, r) for q, r in zip(question_data, response_data)]
-    print(ground_truth)
-    print(predictions)
+    #print(ground_truth)
+    #print(predictions)
 
     f_macro = f1_score(ground_truth, predictions, average='macro')
     f_micro = f1_score(ground_truth, predictions, average='micro')

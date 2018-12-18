@@ -21,13 +21,14 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         model = models.TestModel(data['modelId'])
         question = data['question']
         response = data['questionResponse']
-        prediction = model.predict(question, response)
+        prediction = float(model.predict(question, response))
 
         score = min([0, 0.5, 1], key=lambda x: abs(x - prediction))
-        response = {
+        response_data = {
             "score": score
         }
-        self.wfile.write(json.dumps(response).encode())
+        print(response_data)
+        self.wfile.write(json.dumps(response_data).encode())
 
 
 httpd = HTTPServer(('localhost', 8000), SimpleHTTPRequestHandler)

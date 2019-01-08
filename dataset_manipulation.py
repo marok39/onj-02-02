@@ -9,9 +9,9 @@ def inter_rater_agreement(df):
     same_rating = len(df1.index)
     same_rating_percentage = same_rating*100/total_number_of_answers
 
-    glenn_final = len(df2.index)
+    glenn_final = len(df2.index) - same_rating
     glenn_final_percentage = glenn_final*100/total_number_of_answers
-    amber_final = len(df3.index)
+    amber_final = len(df3.index) - same_rating
     amber_final_percentage = amber_final*100/total_number_of_answers
 
     print('Number of answers:', total_number_of_answers)

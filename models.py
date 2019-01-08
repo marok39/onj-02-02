@@ -32,8 +32,11 @@ class BasicModel:
 
 class TestModel:
     def __init__(self, model_choice):
+        # TODO handle different models
         model_choices = {
-            "A": BasicModel
+            "A": BasicModel,
+            "B": BasicModel,
+            "C": BasicModel
         }
         self.model = model_choices[model_choice]()
 

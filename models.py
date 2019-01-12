@@ -3,6 +3,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 from gensim.models import Word2Vec
 import numpy as np
+from sklearn import svm
 
 
 class BasicModel:
@@ -30,12 +31,27 @@ class BasicModel:
         return str(float(score))
 
 
+class SVM:
+    def __init__(self, data='input/Weightless_dataset_train.csv'):
+        data = pd.read_csv('input/Weightless_dataset_train.csv', sep=",")
+        self.model = Word2Vec.load("weightless_text.model")
+        self.clf = svm.SVC(kernel="rbf", gamma=1e3, decision_function_shape="ovr", class_weight="balanced")
+
+    def fit(self, X, y):
+        vectors = [avg_sentence_vector(x, self.model, 100) for x in X]
+        self.clf.fit(vectors, y)
+
+    def predict(self, question, response):
+        vectors = [avg_sentence_vector(r, self.model, 100) for r in response]
+        return self.clf.predict(vectors)
+
+
 class TestModel:
     def __init__(self, model_choice):
         # TODO handle different models
         model_choices = {
             "A": BasicModel,
-            "B": BasicModel,
+            "B": SVM,
             "C": BasicModel
         }
         self.model = model_choices[model_choice]()

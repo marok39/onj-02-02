@@ -1,4 +1,4 @@
-from .models import *
+from models import *
 import requests
 import pandas as pd
 from sklearn.metrics import f1_score
@@ -46,7 +46,7 @@ def test_SVM():
 
     X_train, X_test, y_train, y_test, q_train, q_test = train_test_split(X, y, question_data, test_size=0.2, random_state=23)
 
-    model = SVM()
+    model = SVM(False)
     model.fit(X_train, y_train, q_train)
     #model.fit(X, y)
     #model.fit(X, y, question_data)
@@ -63,6 +63,10 @@ def test_SVM():
 
 
 #test_server()
+print("Testing model A")
+res = test_modelA()
+print("Macro:", res[0], "Micro:", res[1])
 
+print("Testing model B")
 res = test_SVM()
 print("Macro:", res[0], "Micro:", res[1], "Per class:", res[2])

@@ -33,7 +33,7 @@ class BasicModel:
 
 
 class SVM:
-    def __init__(self, data_path='input/Weightless_dataset_train.csv'):
+    def __init__(self, init_model_on_start, data_path='input/Weightless_dataset_train.csv'):
         data = pd.read_csv(data_path, sep=",")
         self.model = Word2Vec.load("weightless_text.model")
         question_data = [q.strip() for q in data.loc[:, "Question"]]
@@ -52,6 +52,16 @@ class SVM:
         self.clf = svm.SVC(
             kernel="rbf", C=1e3, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
         )
+
+        if init_model_on_start:
+            data = pd.read_csv('input/Weightless_dataset_train.csv', sep=",")
+            question_data = [q.strip() for q in data.loc[:, "Question"]]
+            response_data = data.loc[:, "Response"]
+            ground_truth = [str(r.replace(',', '.')) for r in data.loc[:, "Final.rating"]]
+            X = [r for r in response_data]
+            y = ground_truth
+
+            self.fit(X, y, question_data)
 
     def fit(self, X, y, q=None):
         if q:
@@ -84,8 +94,7 @@ class TestModel:
     def __init__(self):
         print("init models")
         self.cnn = Cnn()
-        self.svm = SVM()
-        self.svm.fit()
+        self.svm = SVM(True)
         self.basic_model = BasicModel()
         self.model = None
 

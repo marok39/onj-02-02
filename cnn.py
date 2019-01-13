@@ -24,18 +24,10 @@ VALIDATION_SPLIT = 0.2
 class_to_predict = 'Final.rating'
 
 
-def clean_str(string):
-    string = re.sub(r"\\", "", string)
-    string = re.sub(r"\'", "", string)
-    string = re.sub(r"\"", "", string)
-    return string.strip().lower()
-
-
 class Cnn:
     def __init__(self):
         self.labels = None
-        self.X_train = None
-        self.Y_train = None
+        self.text = None
         self.df = None
 
     def read_data(self, file_name='input/Weightless_dataset_train.csv'):
@@ -48,7 +40,7 @@ class Cnn:
         print(df.columns)
         print('No. of unique classes', len(set(df[class_to_predict])))
         self.df = df
-        self.labels = df.columns
+        # self.labels = df.columns
 
     def prepare_data(self):
         # get list of all classes
@@ -59,66 +51,29 @@ class Cnn:
         self.df[class_to_predict] = self.df[class_to_predict].apply(lambda i: mapped_classes[i])
         # print(self.df[class_to_predict])
 
-        questions = []
-        responses = []
-        inferences = []
-
-        print(self.df.shape)
-        print(self.df.shape[0])
+        # TODO check string length. might need to normalize for glove vectors
+        text = []
+        labels = []
 
         for i in range(self.df.shape[0]):
             q = self.df['Question'][i]
-            questions.append(q)
             r = self.df['Response'][i]
-            responses.append(r)
             t = self.df['Text.used.to.make.inference'][i]
-            inferences.append(t)
+            text.append(q + r + t)
+            labels.append(self.df['Final.rating'])
+        self.labels = labels
+        self.text = text
 
-
-
-    def todo(self):
-        # print("IN TOOD FUNCITON")
-        # class_to_predict = 'Final.rating'
-        # # reading data
-        # df = pd.read_csv('input/Weightless_dataset_train.csv')
-        # df = df.dropna()
-        # df = df.reset_index(drop=True)
-        # print('Shape of dataset ', df.shape)
-        # print(df.columns)
-        # print('No. of unique classes', len(set(df[class_to_predict])))
-        #
-        # macronum = sorted(set(df[class_to_predict]))
-        # macro_to_id = dict((note, number) for number, note in enumerate(macronum))
-        #
-        #
-        # def fun(i):
-        #     return macro_to_id[i]
-        #
-        #
-        # df[class_to_predict] = df[class_to_predict].apply(fun)
-
-        # done
-
-        texts = []
-        labels = []
-        #
-        # for idx in range(self.df.shape[0]):
-        #     text = self.df['Question'][idx]
-        #     texts.append(text)
-
-        # for idx in data_train['class']:
-        #     labels.append(idx)
-
+    def tokenize(self):
         tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
-        tokenizer.fit_on_texts(texts)
-        sequences = tokenizer.texts_to_sequences(texts)
-
+        tokenizer.fit_on_texts(self.text)
+        sequences = tokenizer.texts_to_sequences(self.text)
         word_index = tokenizer.word_index
-        print('Number of Unique Tokens',len(word_index))
+        print('Number of Unique Tokens', len(word_index))
 
         data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
 
-        labels = to_categorical(np.asarray(labels))
+        labels = to_categorical(np.asarray(self.labels))
         print('Shape of Data Tensor:', data.shape)
         print('Shape of Label Tensor:', labels.shape)
 
@@ -129,12 +84,14 @@ class Cnn:
         nb_validation_samples = int(VALIDATION_SPLIT * data.shape[0])
 
         x_train = data[:-nb_validation_samples]
+        print('Shape of x train', x_train.shape)
         y_train = labels[:-nb_validation_samples]
+        print('Shape of y train', y_train.shape)
         x_val = data[-nb_validation_samples:]
         y_val = labels[-nb_validation_samples:]
 
         embeddings_index = {}
-        f = open('glove.6B.100d.txt', encoding='utf8')
+        f = open('../data/glove.6B.100d.txt', encoding='utf8')
         for line in f:
             values = line.split()
             word = values[0]
@@ -143,7 +100,6 @@ class Cnn:
         f.close()
 
         print('Total %s word vectors in Glove 6B 100d.' % len(embeddings_index))
-
         embedding_matrix = np.random.random((len(word_index) + 1, EMBEDDING_DIM))
         for word, i in word_index.items():
             embedding_vector = embeddings_index.get(word)
@@ -165,7 +121,7 @@ class Cnn:
         l_pool3 = MaxPooling1D(35)(l_cov3)  # global max pooling
         l_flat = Flatten()(l_pool3)
         l_dense = Dense(128, activation='relu')(l_flat)
-        preds = Dense(len(macronum), activation='softmax')(l_dense)
+        preds = Dense(3, activation='softmax')(l_dense)
 
         model = Model(sequence_input, preds)
         model.compile(loss='categorical_crossentropy',
@@ -179,10 +135,10 @@ class Cnn:
         history = model.fit(x_train, y_train, validation_data=(x_val, y_val), epochs=15, batch_size=2, callbacks=[cp])
 
 
+
 if __name__ == "__main__":
     cnn = Cnn()
     cnn.read_data()
     cnn.prepare_data()
-    cnn.todo()
-
-
+    cnn.tokenize()
+    # cnn.todo()

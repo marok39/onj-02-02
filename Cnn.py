@@ -90,12 +90,6 @@ class Cnn:
         self.labels = labels
         self.text = text
 
-    def string_to_vector(self, text):
-        """Creates vector for cnn from passed string"""
-        sequences = self.tokenizer.texts_to_sequences(text)
-        data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
-        return data
-
     def create_data(self):
         """Prepare train and test data"""
         data = []
@@ -146,7 +140,7 @@ class Cnn:
     def create_embeddings_index(self):
         """use glove to create word vectors and save it to file"""
         embeddings_index = {}
-        f = open('../data/glove.6B.100d.txt', encoding='utf8')
+        f = open('input/glove.6B.100d.txt', encoding='utf8')
         for line in f:
             values = line.split()
             word = values[0]
@@ -157,7 +151,7 @@ class Cnn:
         print('Total %s word vectors in Glove 6B 100d.' % len(embeddings_index))
 
         # saving
-        with open('embeddings_index.pickle', 'wb') as handle:
+        with open('calculated_models/embeddings_index.pickle', 'wb') as handle:
             pickle.dump(embeddings_index, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         self.embeddings_index = embeddings_index
@@ -175,7 +169,7 @@ class Cnn:
 
         return list(embedding_matrix.flatten())
 
-    def train_cnn(self, file='calculated_models/model_cnn.hdf5'):
+    def train_cnn(self, file='model_cnn.hdf5'):
         """Train cnn"""
         sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
         embedded_sequences = self.embedding_layer(sequence_input)
@@ -202,10 +196,10 @@ class Cnn:
                             self.y_train,
                             validation_data=(self.x_val, self.y_val),
                             epochs=15,
-                            batch_size=2,
+                            batch_size=16,
                             callbacks=[cp])
 
-    def create_cnn_model(self):
+    def create_cnn_model(self, model_file_name):
         """
         This function creates cnn model and saves it to file
         default: calculated_models/model_cnn.hdf5.old
@@ -217,16 +211,16 @@ class Cnn:
         self.create_data()
         self.create_embedding_layer_with_glove()
 
-        self.train_cnn()
+        self.train_cnn('calculated_models/' + model_file_name)
 
-    def predict(self, question, response):
+    def predict(self, question, response, file='model_cnn.hdf5.best2'):
         """Open cnn model and make prediction"""
-        self.model = self.model if self.model else load_model('calculated_models/model_cnn.hdf5')
+        self.model = self.model if self.model else load_model('calculated_models/' + file)
         all_classes = ["0.0", "0.5", "1.0"]
 
         # load embedding index
         if self.embeddings_index is None:
-            with open('embeddings_index.pickle', 'rb') as handle:
+            with open('calculated_models/embeddings_index.pickle', 'rb') as handle:
                 self.embeddings_index = pickle.load(handle)
 
         # combine question and response
@@ -244,10 +238,11 @@ class Cnn:
         index = np.argmax(result)
         probability = result[0][index]
         print("Predicted class %s with probability %.3f" % (all_classes[index], probability))
-        return all_classes[index]
+        return [all_classes[index], probability]
 
 
-def test():
+def test(test_file_name, model_file_name, use_best=False):
+    """test precalculated model"""
     trueScores = []
     predScores = []
 
@@ -255,7 +250,7 @@ def test():
     _cnn = Cnn()
 
     # read test data set
-    df = pd.read_csv('../onj-02-02/input/Weightless_dataset_train.csv', encoding='utf8')
+    df = pd.read_csv(test_file_name, encoding='utf8')
     i = 0
     for index, row in df.iterrows():
         i += 1
@@ -265,7 +260,11 @@ def test():
         true_s = int(float(row["Final.rating"].replace(",", ".")) * 10)
         trueScores.append(true_s)
         # make prediction
-        pred_s = int(float(_cnn.predict(q, r))*10)
+        if use_best:
+            [pred, _] = _cnn.predict(q, r)
+        else:
+            [pred, _] = _cnn.predict(q, r, model_file_name)
+        pred_s = int(float(pred)*10)
         predScores.append(pred_s)
     print("\t F1 (macro): %f" % f1_score(trueScores, predScores, average='macro'))
     print("\t F1 (micro): %f" % f1_score(trueScores, predScores, average='micro'))
@@ -273,7 +272,15 @@ def test():
 
 
 if __name__ == "__main__":
+    # init
     cnn = Cnn()
-    # cnn.create_cnn_model()
-    test()
+    # file name to which save cnn model
+    new_model_file_name = 'model_cnn.hdf5.test'
+    # train model
+    cnn.create_cnn_model(new_model_file_name)
+    # path to test file
+    test_file = 'input/Weightless_dataset_train.csv'
+    # test model
+    use_best_model = False
+    test(test_file, new_model_file_name, use_best_model)
 

@@ -81,13 +81,21 @@ class SVM:
 
 
 class TestModel:
-    def __init__(self, model_choice):
+    def __init__(self):
+        print("init models")
+        self.cnn = Cnn()
+        self.svm = SVM()
+        self.svm.fit()
+        self.basic_model = BasicModel()
+        self.model = None
+
+    def set_model(self, model_id):
         model_choices = {
-            "A": BasicModel,
-            "B": SVM,
-            "C": Cnn
+            "A": self.basic_model,
+            "B": self.svm,
+            "C": self.cnn
         }
-        self.model = model_choices[model_choice]()
+        self.model = model_choices[model_id]
 
     def predict(self, question, response):
         return self.model.predict(question, response)

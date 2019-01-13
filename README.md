@@ -1,5 +1,8 @@
 # Assignment 2: IMapBooks - Automatic Question Response Grading
 
+## Env configuration
+Anaconda env is saved in `requirements.txt` file.
+
 ## How to run this repo?
 
 Start`test-server.py` and use `onj-eval.py` script to test all 3 models.

@@ -2,6 +2,8 @@ from models import *
 import requests
 import pandas as pd
 from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
+
 
 def test_server():
     request_json = {
@@ -31,7 +33,30 @@ def test_modelA():
     return f_macro, f_micro
 
 
-test_server()
+def test_SVM():
+    data = pd.read_csv('input/Weightless_dataset_train.csv', sep=",")
+    question_data = [q.strip() for q in data.loc[:, "Question"]]
+    response_data = data.loc[:, "Response"]
+    ground_truth = [str(r.replace(',', '.')) for r in data.loc[:, "Final.rating"]]
 
-res = test_modelA()
+    X = [r for r in response_data]
+    y = ground_truth
+
+    X_train, X_test, y_train, y_test, q_train, q_test = train_test_split(X, y, question_data, test_size=0.2, random_state=123)
+
+    model = SVM()
+    model.fit(X_train, y_train)
+    #model.fit(X, y)
+    predictions = model.predict([], X_test)
+    print(predictions)
+
+    f_macro = f1_score(y_test, predictions, average='macro')
+    f_micro = f1_score(y_test, predictions, average='micro')
+
+    return f_macro, f_micro
+
+
+#test_server()
+
+res = test_SVM()
 print(res)

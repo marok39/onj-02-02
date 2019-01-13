@@ -54,6 +54,8 @@ class Cnn:
         # tokenizer
         self.tokenizer = None
 
+        self.model = None
+
     def read_data(self, file_name='input/Weightless_dataset_train.csv'):
         """Read data from file and save it to pandas data frame"""
 
@@ -67,6 +69,7 @@ class Cnn:
         # self.labels = df.columns
 
     def prepare_data(self):
+        """Prepares data for processing"""
         # get list of all classes
         all_classes = sorted(set(self.df[class_to_predict]))
         # convert to dict to map them
@@ -87,16 +90,6 @@ class Cnn:
         self.labels = labels
         self.text = text
 
-    def save_tokenizer_to_file(self, tokenizer):
-        # saving
-        with open('tokenizer.pickle', 'wb') as handle:
-            pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-    def load_tokenizer_from_file(self):
-        # loading
-        with open('tokenizer.pickle', 'rb') as handle:
-            self.tokenizer = pickle.load(handle)
-
     def string_to_vector(self, text):
         """Creates vector for cnn from passed string"""
         sequences = self.tokenizer.texts_to_sequences(text)
@@ -104,38 +97,7 @@ class Cnn:
         return data
 
     def create_data(self):
-        tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
-        # tokenizer.fit_on_texts(self.text)
-        sequences = tokenizer.texts_to_sequences(self.text)
-        self.word_index = tokenizer.word_index
-        print('Number of Unique Tokens', len(self.word_index))
-
-        data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
-
-        # save tokenizer
-        self.save_tokenizer_to_file(tokenizer)
-
-        labels = to_categorical(np.asarray(self.labels))
-        print('Shape of Data Tensor:', data.shape)
-        print('Shape of Label Tensor:', labels.shape)
-
-        indices = np.arange(data.shape[0])
-        np.random.shuffle(indices)
-        data = data[indices]
-        labels = labels[indices]
-        nb_validation_samples = int(VALIDATION_SPLIT * data.shape[0])
-
-        self.x_train = data[:-nb_validation_samples]
-        print('Shape of x train', self.x_train.shape)
-        # print(self.x_train)
-        self.y_train = labels[:-nb_validation_samples]
-        print('Shape of y train', self.y_train.shape)
-        self.x_val = data[-nb_validation_samples:]
-        print('Shape of x val', self.x_val.shape)
-        self.y_val = labels[-nb_validation_samples:]
-        print('Shape of y val', self.y_val.shape)
-
-    def create_data_2(self):
+        """Prepare train and test data"""
         data = []
 
         for sentence in self.text:
@@ -164,39 +126,7 @@ class Cnn:
         print('Shape of y val', self.y_val.shape)
 
     def create_embedding_layer_with_glove(self):
-        embeddings_index = {}
-        f = open('../data/glove.6B.100d.txt', encoding='utf8')
-        for line in f:
-            values = line.split()
-            word = values[0]
-            coefs = np.asarray(values[1:], dtype='float32')
-            embeddings_index[word] = coefs
-        f.close()
-
-        print('Total %s word vectors in Glove 6B 100d.' % len(embeddings_index))
-        embedding_matrix = np.random.random((len(self.word_index) + 1, EMBEDDING_DIM))
-        for word, i in self.word_index.items():
-            embedding_vector = embeddings_index.get(word)
-            if embedding_vector is not None:
-                # words not found in embedding index will be all-zeros.
-                embedding_matrix[i] = embedding_vector
-
-        self.embedding_layer = Embedding(len(self.word_index) + 1,
-                                         EMBEDDING_DIM, weights=[embedding_matrix],
-                                         input_length=MAX_SEQUENCE_LENGTH, trainable=True)
-
-    def create_embedding_layer_with_glove_2(self):
-        embeddings_index = {}
-        f = open('../data/glove.6B.100d.txt', encoding='utf8')
-        for line in f:
-            values = line.split()
-            word = values[0]
-            coefs = np.asarray(values[1:], dtype='float32')
-            embeddings_index[word] = coefs
-        f.close()
-
-        print('Total %s word vectors in Glove 6B 100d.' % len(embeddings_index))
-
+        """Create embedding layer"""
         sentence = ' '.join([str(x) for x in self.text])
         arr = clean_sentence(sentence)
         word_index = set(arr)
@@ -204,7 +134,7 @@ class Cnn:
 
         embedding_matrix = np.random.random((len(word_index) + 1, EMBEDDING_DIM))
         for i, word in enumerate(word_index):
-            embedding_vector = embeddings_index.get(word)
+            embedding_vector = self.embeddings_index.get(word)
             if embedding_vector is not None:
                 # words not found in embedding index will be all-zeros.
                 embedding_matrix[i] = embedding_vector
@@ -214,6 +144,7 @@ class Cnn:
                                          input_length=MAX_SEQUENCE_LENGTH, trainable=True)
 
     def create_embeddings_index(self):
+        """use glove to create word vectors and save it to file"""
         embeddings_index = {}
         f = open('../data/glove.6B.100d.txt', encoding='utf8')
         for line in f:
@@ -232,6 +163,7 @@ class Cnn:
         self.embeddings_index = embeddings_index
 
     def sentence_to_input(self, sentence):
+        """Map sentence to vector"""
         arr = clean_sentence(sentence)
         embedding_matrix = np.random.random((len(arr) + 1, EMBEDDING_DIM))
 
@@ -241,12 +173,10 @@ class Cnn:
                 # words not found in embedding index will be all-zeros.
                 embedding_matrix[i] = embedding_vector
 
-        # embedding_layer = Embedding(len(arr) + 1,
-        #                                  EMBEDDING_DIM, weights=[embedding_matrix],
-        #                                  input_length=MAX_SEQUENCE_LENGTH, trainable=True)
         return list(embedding_matrix.flatten())
 
     def train_cnn(self, file='calculated_models/model_cnn.hdf5'):
+        """Train cnn"""
         sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
         embedded_sequences = self.embedding_layer(sequence_input)
         l_cov1 = Conv1D(128, 5, activation='relu')(embedded_sequences)
@@ -283,40 +213,33 @@ class Cnn:
         self.read_data()
         self.prepare_data()
 
-        # self.create_data()
-        # self.create_embedding_layer_with_glove()
-
         self.create_embeddings_index()
-        self.create_data_2()
-        self.create_embedding_layer_with_glove_2()
+        self.create_data()
+        self.create_embedding_layer_with_glove()
 
         self.train_cnn()
 
     def predict(self, question, response):
         """Open cnn model and make prediction"""
-        # load tokenizer
-        # if self.tokenizer is None:
-        #     self.load_tokenizer_from_file()
+        self.model = self.model if self.model else load_model('calculated_models/model_cnn.hdf5')
+        all_classes = ["0.0", "0.5", "1.0"]
 
-        with open('embeddings_index.pickle', 'rb') as handle:
-            self.embeddings_index = pickle.load(handle)
+        # load embedding index
+        if self.embeddings_index is None:
+            with open('embeddings_index.pickle', 'rb') as handle:
+                self.embeddings_index = pickle.load(handle)
 
+        # combine question and response
         combined_question_response = question + response
 
+        # create input data
         data = []
         data.append(self.sentence_to_input(combined_question_response))
         data = pad_sequences(data, maxlen=MAX_SEQUENCE_LENGTH)
         data = np.abs(data)
 
-        model = load_model('calculated_models/model_cnn.hdf5')
-        all_classes = ["0.0", "0.5", "1.0"]
-
-        # combined_question_response = question+response
-        # data = self.string_to_vector(data)
-        # print(data.shape)
-        # print(data)
-
-        result = model.predict(data)
+        # make prediction
+        result = self.model.predict(data)
         # print(result)
         index = np.argmax(result)
         probability = result[0][index]
@@ -328,21 +251,22 @@ def test():
     trueScores = []
     predScores = []
 
+    # init cnn
     _cnn = Cnn()
-    _cnn.load_tokenizer_from_file()
 
+    # read test data set
     df = pd.read_csv('../onj-02-02/input/Weightless_dataset_train.csv', encoding='utf8')
     i = 0
     for index, row in df.iterrows():
         i += 1
         q = row['Question']
         r = row['Response']
+        # get true score
         true_s = int(float(row["Final.rating"].replace(",", ".")) * 10)
         trueScores.append(true_s)
+        # make prediction
         pred_s = int(float(_cnn.predict(q, r))*10)
         predScores.append(pred_s)
-        if i > 5:
-            break
     print("\t F1 (macro): %f" % f1_score(trueScores, predScores, average='macro'))
     print("\t F1 (micro): %f" % f1_score(trueScores, predScores, average='micro'))
     print("\t F1 (weighted): %f" % f1_score(trueScores, predScores, average='weighted'))

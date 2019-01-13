@@ -2,7 +2,7 @@
 
 ## How to run this repo?
 
-Start _test-server.py_ and use _onj-eval.py_ script to test all 3 models.
+Start`test-server.py` and use `onj-eval.py` script to test all 3 models.
 Test server is running on port __8080__.
 
 ## Pre trained models
@@ -10,10 +10,10 @@ This repo contains pre trained models. These models are located in calculated_mo
  
 ## Manual testing model A & B
 
-Run _test.py_ to test model A nd B.
+Run `test.py` to test model A nd B.
 
 ## Manual testing model C
-You can manually train and test cnn.
+You can manually train and test cnn using `cnn.py`.
 
 ### Training CCN
 - download http://nlp.stanford.edu/data/glove.6B.zip

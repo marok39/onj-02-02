@@ -11,7 +11,7 @@ class BasicModel:
         data = pd.read_csv('input/Weightless_dataset_train_A.csv', sep=",")
         inference_data = [clean_sentence(s) for s in data.loc[:, "Text.used.to.make.inference"]]
         response_data = [clean_sentence(s) for s in data.loc[:, "Response"]]
-        question_data = data.loc[:, "Question"]
+        question_data = [q.strip() for q in data.loc[:, "Question"]]
         # print(inference_data, question_data, response_data)
 
         self.correct_answers = {}
@@ -32,18 +32,51 @@ class BasicModel:
 
 
 class SVM:
-    def __init__(self, data='input/Weightless_dataset_train.csv'):
-        data = pd.read_csv('input/Weightless_dataset_train.csv', sep=",")
+    def __init__(self, data_path='input/Weightless_dataset_train.csv'):
+        data = pd.read_csv(data_path, sep=",")
         self.model = Word2Vec.load("weightless_text.model")
-        self.clf = svm.SVC(kernel="rbf", gamma=1e3, decision_function_shape="ovr", class_weight="balanced")
+        question_data = [q.strip() for q in data.loc[:, "Question"]]
+        questions = {}
+        idx = 0
+        for q in question_data:
+            if q not in questions:
+                questions[q] = idx
+                idx += 1
+        self.questions = questions
+        self.models = {}
+        for q in self.questions:
+            self.models[q] = svm.SVC(
+                kernel="rbf", C=1e3, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
+            )
+        self.clf = svm.SVC(
+            kernel="rbf", C=1e3, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
+        )
 
-    def fit(self, X, y):
-        vectors = [avg_sentence_vector(x, self.model, 100) for x in X]
-        self.clf.fit(vectors, y)
+    def fit(self, X, y, q=None):
+        if q:
+            question = {}
+            for i in range(len(y)):
+                if q[i] not in question:
+                    question[q[i]] = {
+                        'X': [X[i]],
+                        'y': [y[i]]
+                    }
+                else:
+                    question[q[i]]['X'].extend([X[i]])
+                    question[q[i]]['y'].extend([y[i]])
+            for q in self.questions:
+                vs = [avg_sentence_vector(x, self.model, 100) for x in question[q]['X']]
+                self.models[q].fit(vs, question[q]['y'])
+        else:
+            vectors = [avg_sentence_vector(x, self.model, 100) for x in X]
+            self.clf.fit(vectors, y)
 
     def predict(self, question, response):
         vectors = [avg_sentence_vector(r, self.model, 100) for r in response]
-        return self.clf.predict(vectors)
+        if question:
+            return [self.models[q].predict([vectors[i]])[0] for i, q in enumerate(question)]
+        else:
+            return self.clf.predict(vectors)
 
 
 class TestModel:

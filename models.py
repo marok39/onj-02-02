@@ -5,6 +5,7 @@ from gensim.models import Word2Vec
 import numpy as np
 from sklearn import svm
 
+from Cnn import *
 
 class BasicModel:
     def __init__(self, data='input/Weightless_dataset_train_A.csv'):
@@ -81,11 +82,10 @@ class SVM:
 
 class TestModel:
     def __init__(self, model_choice):
-        # TODO handle different models
         model_choices = {
             "A": BasicModel,
             "B": SVM,
-            "C": BasicModel
+            "C": Cnn
         }
         self.model = model_choices[model_choice]()
 

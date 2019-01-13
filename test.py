@@ -1,4 +1,4 @@
-from models import *
+from .models import *
 import requests
 import pandas as pd
 from sklearn.metrics import f1_score

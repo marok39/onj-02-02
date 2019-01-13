@@ -16,7 +16,9 @@ from keras.layers import Dense, Input, Flatten
 from keras.layers import Conv1D, MaxPooling1D, Embedding, Dropout
 from keras.models import Model
 from keras.callbacks import ModelCheckpoint
-
+import pickle
+from sklearn.metrics import f1_score
+from nltk.tokenize import RegexpTokenizer
 
 MAX_SEQUENCE_LENGTH = 1000
 MAX_NB_WORDS = 20000
@@ -24,6 +26,12 @@ EMBEDDING_DIM = 100
 VALIDATION_SPLIT = 0.2
 
 class_to_predict = 'Final.rating'
+
+
+def clean_sentence(sentence):
+    tokenizer = RegexpTokenizer(r'\w+')
+    sentence = tokenizer.tokenize(sentence)
+    return [w.lower() for w in sentence]
 
 
 class Cnn:
@@ -41,6 +49,10 @@ class Cnn:
 
         # layer
         self.embedding_layer = None
+        self.embeddings_index = None
+
+        # tokenizer
+        self.tokenizer = None
 
     def read_data(self, file_name='input/Weightless_dataset_train.csv'):
         """Read data from file and save it to pandas data frame"""
@@ -75,27 +87,33 @@ class Cnn:
         self.labels = labels
         self.text = text
 
+    def save_tokenizer_to_file(self, tokenizer):
+        # saving
+        with open('tokenizer.pickle', 'wb') as handle:
+            pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def load_tokenizer_from_file(self):
+        # loading
+        with open('tokenizer.pickle', 'rb') as handle:
+            self.tokenizer = pickle.load(handle)
+
     def string_to_vector(self, text):
         """Creates vector for cnn from passed string"""
-        tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
-        tokenizer.fit_on_texts(text)
-        sequences = tokenizer.texts_to_sequences(text)
-        self.word_index = tokenizer.word_index
-        print('Number of Unique Tokens', len(self.word_index))
-
+        sequences = self.tokenizer.texts_to_sequences(text)
         data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
         return data
 
     def create_data(self):
-        # tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
+        tokenizer = Tokenizer(num_words=MAX_NB_WORDS)
         # tokenizer.fit_on_texts(self.text)
-        # sequences = tokenizer.texts_to_sequences(self.text)
-        # word_index = tokenizer.word_index
-        # print('Number of Unique Tokens', len(word_index))
-        #
-        # data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
+        sequences = tokenizer.texts_to_sequences(self.text)
+        self.word_index = tokenizer.word_index
+        print('Number of Unique Tokens', len(self.word_index))
 
-        data = self.string_to_vector(self.text)
+        data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
+
+        # save tokenizer
+        self.save_tokenizer_to_file(tokenizer)
 
         labels = to_categorical(np.asarray(self.labels))
         print('Shape of Data Tensor:', data.shape)
@@ -109,11 +127,41 @@ class Cnn:
 
         self.x_train = data[:-nb_validation_samples]
         print('Shape of x train', self.x_train.shape)
-        print(self.x_train)
+        # print(self.x_train)
         self.y_train = labels[:-nb_validation_samples]
         print('Shape of y train', self.y_train.shape)
         self.x_val = data[-nb_validation_samples:]
+        print('Shape of x val', self.x_val.shape)
         self.y_val = labels[-nb_validation_samples:]
+        print('Shape of y val', self.y_val.shape)
+
+    def create_data_2(self):
+        data = []
+
+        for sentence in self.text:
+            tmp = self.sentence_to_input(sentence)
+            data.append(tmp)
+
+        data = pad_sequences(data, maxlen=MAX_SEQUENCE_LENGTH)
+
+        labels = to_categorical(np.asarray(self.labels))
+        print('Shape of Data Tensor:', data.shape)
+        print('Shape of Label Tensor:', labels.shape)
+
+        indices = np.arange(data.shape[0])
+        np.random.shuffle(indices)
+        data = data[indices]
+        labels = labels[indices]
+        nb_validation_samples = int(VALIDATION_SPLIT * data.shape[0])
+
+        self.x_train = np.abs(data[:-nb_validation_samples])
+        print('Shape of x train', self.x_train.shape)
+        self.y_train = labels[:-nb_validation_samples]
+        print('Shape of y train', self.y_train.shape)
+        self.x_val = np.abs(data[-nb_validation_samples:])
+        print('Shape of x val', self.x_val.shape)
+        self.y_val = labels[-nb_validation_samples:]
+        print('Shape of y val', self.y_val.shape)
 
     def create_embedding_layer_with_glove(self):
         embeddings_index = {}
@@ -136,6 +184,67 @@ class Cnn:
         self.embedding_layer = Embedding(len(self.word_index) + 1,
                                          EMBEDDING_DIM, weights=[embedding_matrix],
                                          input_length=MAX_SEQUENCE_LENGTH, trainable=True)
+
+    def create_embedding_layer_with_glove_2(self):
+        embeddings_index = {}
+        f = open('../data/glove.6B.100d.txt', encoding='utf8')
+        for line in f:
+            values = line.split()
+            word = values[0]
+            coefs = np.asarray(values[1:], dtype='float32')
+            embeddings_index[word] = coefs
+        f.close()
+
+        print('Total %s word vectors in Glove 6B 100d.' % len(embeddings_index))
+
+        sentence = ' '.join([str(x) for x in self.text])
+        arr = clean_sentence(sentence)
+        word_index = set(arr)
+        print('Number of Unique Tokens', len(word_index))
+
+        embedding_matrix = np.random.random((len(word_index) + 1, EMBEDDING_DIM))
+        for i, word in enumerate(word_index):
+            embedding_vector = embeddings_index.get(word)
+            if embedding_vector is not None:
+                # words not found in embedding index will be all-zeros.
+                embedding_matrix[i] = embedding_vector
+
+        self.embedding_layer = Embedding(len(word_index) + 1,
+                                         EMBEDDING_DIM, weights=[embedding_matrix],
+                                         input_length=MAX_SEQUENCE_LENGTH, trainable=True)
+
+    def create_embeddings_index(self):
+        embeddings_index = {}
+        f = open('../data/glove.6B.100d.txt', encoding='utf8')
+        for line in f:
+            values = line.split()
+            word = values[0]
+            coefs = np.asarray(values[1:], dtype='float32')
+            embeddings_index[word] = coefs
+        f.close()
+
+        print('Total %s word vectors in Glove 6B 100d.' % len(embeddings_index))
+
+        # saving
+        with open('embeddings_index.pickle', 'wb') as handle:
+            pickle.dump(embeddings_index, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        self.embeddings_index = embeddings_index
+
+    def sentence_to_input(self, sentence):
+        arr = clean_sentence(sentence)
+        embedding_matrix = np.random.random((len(arr) + 1, EMBEDDING_DIM))
+
+        for i, word in enumerate(arr):
+            embedding_vector = self.embeddings_index.get(word)
+            if embedding_vector is not None:
+                # words not found in embedding index will be all-zeros.
+                embedding_matrix[i] = embedding_vector
+
+        # embedding_layer = Embedding(len(arr) + 1,
+        #                                  EMBEDDING_DIM, weights=[embedding_matrix],
+        #                                  input_length=MAX_SEQUENCE_LENGTH, trainable=True)
+        return list(embedding_matrix.flatten())
 
     def train_cnn(self, file='calculated_models/model_cnn.hdf5'):
         sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
@@ -173,31 +282,74 @@ class Cnn:
         """
         self.read_data()
         self.prepare_data()
-        self.create_data()
-        self.create_embedding_layer_with_glove()
+
+        # self.create_data()
+        # self.create_embedding_layer_with_glove()
+
+        self.create_embeddings_index()
+        self.create_data_2()
+        self.create_embedding_layer_with_glove_2()
+
         self.train_cnn()
 
     def predict(self, question, response):
         """Open cnn model and make prediction"""
+        # load tokenizer
+        # if self.tokenizer is None:
+        #     self.load_tokenizer_from_file()
+
+        with open('embeddings_index.pickle', 'rb') as handle:
+            self.embeddings_index = pickle.load(handle)
+
+        combined_question_response = question + response
+
+        data = []
+        data.append(self.sentence_to_input(combined_question_response))
+        data = pad_sequences(data, maxlen=MAX_SEQUENCE_LENGTH)
+        data = np.abs(data)
+
         model = load_model('calculated_models/model_cnn.hdf5')
         all_classes = ["0.0", "0.5", "1.0"]
 
-        combined_question_response = question+response
-        data = self.string_to_vector(combined_question_response)
+        # combined_question_response = question+response
+        # data = self.string_to_vector(data)
+        # print(data.shape)
+        # print(data)
 
-        predicted_class = model.predict(data, batch_size=1)
-        index = np.argmax(predicted_class)
-        probability = predicted_class[0][index]
+        result = model.predict(data)
+        # print(result)
+        index = np.argmax(result)
+        probability = result[0][index]
         print("Predicted class %s with probability %.3f" % (all_classes[index], probability))
         return all_classes[index]
+
+
+def test():
+    trueScores = []
+    predScores = []
+
+    _cnn = Cnn()
+    _cnn.load_tokenizer_from_file()
+
+    df = pd.read_csv('../onj-02-02/input/Weightless_dataset_train.csv', encoding='utf8')
+    i = 0
+    for index, row in df.iterrows():
+        i += 1
+        q = row['Question']
+        r = row['Response']
+        true_s = int(float(row["Final.rating"].replace(",", ".")) * 10)
+        trueScores.append(true_s)
+        pred_s = int(float(_cnn.predict(q, r))*10)
+        predScores.append(pred_s)
+        if i > 5:
+            break
+    print("\t F1 (macro): %f" % f1_score(trueScores, predScores, average='macro'))
+    print("\t F1 (micro): %f" % f1_score(trueScores, predScores, average='micro'))
+    print("\t F1 (weighted): %f" % f1_score(trueScores, predScores, average='weighted'))
 
 
 if __name__ == "__main__":
     cnn = Cnn()
     # cnn.create_cnn_model()
+    test()
 
-    q = 'How does Shiranna feel as the shuttle is taking off?'
-    r = 'She was very scared. She was feeling the speed of the space shuttle. she remembered her mom and wanted to meet her very soon.'
-
-    correct_result = 0.5
-    cnn.predict(q, r)

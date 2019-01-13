@@ -7,6 +7,7 @@ from sklearn import svm
 
 from Cnn import *
 
+
 class BasicModel:
     def __init__(self, data='input/Weightless_dataset_train_A.csv'):
         data = pd.read_csv('input/Weightless_dataset_train_A.csv', sep=",")
@@ -18,15 +19,14 @@ class BasicModel:
         self.correct_answers = {}
         for q, r in zip(question_data, response_data):
             self.correct_answers[q] = r
-        self.model = Word2Vec(inference_data, min_count=1)
-        self.model.save("basic_model.model")
+        self.model = Word2Vec.load("basic_model.model")
 
     def predict(self, question, response):
         v1 = avg_sentence_vector(self.correct_answers[question], self.model, 100)
         response = clean_sentence(response)
         v2 = avg_sentence_vector(response, self.model, 100)
         c = abs(cosine_similarity(v1, v2))
-        if 0.37 < c < 0.63:
+        if 0.12 < c < 0.45:
             return str(0.5)
         score = min([0, 1], key=lambda x: abs(x - c))
         return str(float(score))

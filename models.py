@@ -84,7 +84,9 @@ class SVM:
 
     def predict(self, question, response):
         vectors = [avg_sentence_vector(r, self.model, 100) for r in response]
-        if question:
+        if isinstance(question, str):
+            return self.models[question].predict([avg_sentence_vector(response, self.model, 100)])[0]
+        elif question:
             return [self.models[q].predict([vectors[i]])[0] for i, q in enumerate(question)]
         else:
             return self.clf.predict(vectors)

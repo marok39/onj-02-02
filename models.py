@@ -3,6 +3,9 @@ from nltk.corpus import stopwords
 from nltk.tokenize import RegexpTokenizer
 from gensim.models import Word2Vec
 import numpy as np
+from sklearn import svm
+
+from Cnn import *
 
 
 class BasicModel:
@@ -10,32 +13,102 @@ class BasicModel:
         data = pd.read_csv('input/Weightless_dataset_train_A.csv', sep=",")
         inference_data = [clean_sentence(s) for s in data.loc[:, "Text.used.to.make.inference"]]
         response_data = [clean_sentence(s) for s in data.loc[:, "Response"]]
-        question_data = data.loc[:, "Question"]
+        question_data = [q.strip() for q in data.loc[:, "Question"]]
         # print(inference_data, question_data, response_data)
 
         self.correct_answers = {}
         for q, r in zip(question_data, response_data):
             self.correct_answers[q] = r
-        self.model = Word2Vec(inference_data, min_count=1)
-        self.model.save("basic_model.model")
+        self.model = Word2Vec.load("basic_model.model")
 
     def predict(self, question, response):
-        v1 = avg_sentence_vector(self.correct_answers[question], self.model, 100)
+        q = question.strip()
+        v1 = avg_sentence_vector(self.correct_answers[q], self.model, 100)
         response = clean_sentence(response)
         v2 = avg_sentence_vector(response, self.model, 100)
         c = abs(cosine_similarity(v1, v2))
-        if 0.37 < c < 0.63:
+        if 0.12 < c < 0.45:
             return str(0.5)
         score = min([0, 1], key=lambda x: abs(x - c))
         return str(float(score))
 
 
+class SVM:
+    def __init__(self, init_model_on_start, data_path='input/Weightless_dataset_train.csv'):
+        data = pd.read_csv(data_path, sep=",")
+        self.model = Word2Vec.load("weightless_text.model")
+        question_data = [q.strip() for q in data.loc[:, "Question"]]
+        questions = {}
+        idx = 0
+        for q in question_data:
+            if q not in questions:
+                questions[q] = idx
+                idx += 1
+        self.questions = questions
+        self.models = {}
+        for q in self.questions:
+            self.models[q] = svm.SVC(
+                kernel="rbf", C=2e2, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
+            )
+        self.clf = svm.SVC(
+            kernel="rbf", C=2e2, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
+        )
+
+        if init_model_on_start:
+            data = pd.read_csv('input/Weightless_dataset_train.csv', sep=",")
+            question_data = [q.strip() for q in data.loc[:, "Question"]]
+            response_data = data.loc[:, "Response"]
+            ground_truth = [str(r.replace(',', '.')) for r in data.loc[:, "Final.rating"]]
+            X = [r for r in response_data]
+            y = ground_truth
+
+            self.fit(X, y, question_data)
+
+    def fit(self, X, y, q=None):
+        if q:
+            question = {}
+            for i in range(len(y)):
+                if q[i] not in question:
+                    question[q[i]] = {
+                        'X': [X[i]],
+                        'y': [y[i]]
+                    }
+                else:
+                    question[q[i]]['X'].extend([X[i]])
+                    question[q[i]]['y'].extend([y[i]])
+            for q in self.questions:
+                vs = [avg_sentence_vector(x, self.model, 100) for x in question[q]['X']]
+                self.models[q].fit(vs, question[q]['y'])
+        else:
+            vectors = [avg_sentence_vector(x, self.model, 100) for x in X]
+            self.clf.fit(vectors, y)
+
+    def predict(self, question, response):
+        vectors = [avg_sentence_vector(r, self.model, 100) for r in response]
+        if isinstance(question, str):
+            q = question.strip()
+            return self.models[q].predict([avg_sentence_vector(response, self.model, 100)])[0]
+        elif question:
+            return [self.models[q].predict([vectors[i]])[0] for i, q in enumerate(question)]
+        else:
+            return self.clf.predict(vectors)
+
+
 class TestModel:
-    def __init__(self, model_choice):
+    def __init__(self):
+        print("init models")
+        self.cnn = Cnn()
+        self.svm = SVM(True)
+        self.basic_model = BasicModel()
+        self.model = None
+
+    def set_model(self, model_id):
         model_choices = {
-            "A": BasicModel
+            "A": self.basic_model,
+            "B": self.svm,
+            "C": self.cnn
         }
-        self.model = model_choices[model_choice]()
+        self.model = model_choices[model_id]
 
     def predict(self, question, response):
         return self.model.predict(question, response)

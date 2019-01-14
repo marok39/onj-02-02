@@ -22,8 +22,7 @@ class BasicModel:
         self.model = Word2Vec.load("basic_model.model")
 
     def predict(self, question, response):
-        q = question.strip()
-        v1 = avg_sentence_vector(self.correct_answers[q], self.model, 100)
+        v1 = avg_sentence_vector(self.correct_answers[question], self.model, 100)
         response = clean_sentence(response)
         v2 = avg_sentence_vector(response, self.model, 100)
         c = abs(cosine_similarity(v1, v2))
@@ -48,10 +47,10 @@ class SVM:
         self.models = {}
         for q in self.questions:
             self.models[q] = svm.SVC(
-                kernel="rbf", C=2e2, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
+                kernel="rbf", C=1e3, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
             )
         self.clf = svm.SVC(
-            kernel="rbf", C=2e2, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
+            kernel="rbf", C=1e3, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
         )
 
         if init_model_on_start:
@@ -86,8 +85,7 @@ class SVM:
     def predict(self, question, response):
         vectors = [avg_sentence_vector(r, self.model, 100) for r in response]
         if isinstance(question, str):
-            q = question.strip()
-            return self.models[q].predict([avg_sentence_vector(response, self.model, 100)])[0]
+            return self.models[question].predict([avg_sentence_vector(response, self.model, 100)])[0]
         elif question:
             return [self.models[q].predict([vectors[i]])[0] for i, q in enumerate(question)]
         else:

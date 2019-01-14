@@ -31,5 +31,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(response_data).encode())
 
 
-httpd = HTTPServer(('localhost', 8000), SimpleHTTPRequestHandler)
-httpd.serve_forever()
+if __name__ == "__main__":
+    httpd = HTTPServer(('localhost', 8080), SimpleHTTPRequestHandler)
+    print("Server running on localhost:8080")
+    httpd.serve_forever()

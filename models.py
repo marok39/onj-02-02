@@ -47,10 +47,10 @@ class SVM:
         self.models = {}
         for q in self.questions:
             self.models[q] = svm.SVC(
-                kernel="rbf", C=1e3, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
+                kernel="rbf", C=2e2, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
             )
         self.clf = svm.SVC(
-            kernel="rbf", C=1e3, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
+            kernel="rbf", C=2e2, gamma=1e3, decision_function_shape="ovr", class_weight="balanced", probability=True
         )
 
         if init_model_on_start:
